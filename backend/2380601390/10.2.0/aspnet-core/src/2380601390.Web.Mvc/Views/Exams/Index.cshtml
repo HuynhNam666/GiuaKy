@@ -1,0 +1,147 @@
+@using _2380601390.Exams
+@using _2380601390.Web.Startup
+@using _2380601390.Web.Models.Exams
+@model ExamListViewModel
+@{
+    Layout = "~/Views/Shared/Layout/_TeacherLayout.cshtml";
+    ViewBag.Title = "Đề thi";
+    ViewBag.CurrentPageName = PageNames.Exams;
+    var hasErrors = Model.Errors.Count > 0;
+
+    (string Text, string Css) Status(ExamVersionStatus s) => s switch
+    {
+        ExamVersionStatus.Draft => ("Nháp", ""),
+        ExamVersionStatus.Published => ("Đã xuất bản", "tz-badge--ok"),
+        _ => ("Lưu trữ", "tz-badge--mut")
+    };
+}
+@section scripts
+{
+    <script src="~/view-resources/Views/Exams/Index.js" asp-append-version="true"></script>
+}
+<div class="tz-head">
+    <div class="titles">
+        <h1>Đề thi TOEIC Reading</h1>
+        <p>Tạo đề từ file Word (.docx), xem trước, chỉnh sửa và xuất bản cho sinh viên.</p>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.SuccessMessage))
+{
+    <div class="tz-alert tz-alert--ok" id="ImportSuccess"><img class="tz-ico" src="~/img/figma/check-green.svg" alt="" /><div>@Model.SuccessMessage</div></div>
+}
+
+<div class="tz-card tz-card--pad">
+    <h2>Tạo đề từ file Word (.docx)</h2>
+    <form id="UploadForm" asp-controller="Exams" asp-action="Upload" method="post" enctype="multipart/form-data">
+        <input type="file" id="ExamFile" name="file" accept=".docx" class="tz-hidden" />
+
+        <div class="tz-drop @(hasErrors ? "tz-hidden" : "")" id="DropIdle">
+            <span class="ic"><img class="tz-ico" src="~/img/figma/upload-blue-26.svg" alt="" /></span>
+            <div class="tx">
+                <b>Kéo thả file .docx vào đây hoặc bấm "Chọn file"</b>
+                <span>Chuẩn tags v1 · tối đa 20 MB · hệ thống chỉ lưu khi file đúng 100%, nếu sai sẽ hiển thị danh sách lỗi để sửa file.</span>
+            </div>
+            <button type="button" class="tz-btn" id="BtnPick"><img class="tz-ico" src="~/img/figma/file-dark.svg" alt="" />Chọn file</button>
+            <button type="submit" class="tz-btn tz-btn--pri" id="BtnUploadIdle"><img class="tz-ico" src="~/img/figma/upload-white.svg" alt="" />Upload và kiểm tra</button>
+        </div>
+
+        <div class="tz-filepick @(hasErrors ? "" : "tz-hidden")" id="FileChosen">
+            <img class="tz-ico" src="~/img/figma/file-blue-22.svg" alt="" />
+            <div class="nm"><b id="FileName">@(Model.UploadedFileName ?? "")</b><span id="FileSize">@(hasErrors ? "Hãy chọn lại file đã sửa rồi upload" : "")</span></div>
+            <button type="button" class="tz-btn" id="BtnPickAgain">Chọn file khác</button>
+            <button type="submit" class="tz-btn tz-btn--pri" id="BtnUpload" @(hasErrors ? "disabled" : "")><img class="tz-ico" src="~/img/figma/upload-white.svg" alt="" />Upload và kiểm tra</button>
+        </div>
+    </form>
+</div>
+
+@if (hasErrors)
+{
+    <div class="tz-card tz-card--bad" id="ImportErrors">
+        <div class="tz-alert tz-alert--bad" style="border-radius:0">
+            <img class="tz-ico" src="~/img/figma/alert-red-22.svg" alt="" />
+            <div>
+                <b>Không thể tạo đề@(string.IsNullOrEmpty(Model.UploadedFileName) ? "" : " từ \"" + Model.UploadedFileName + "\""): @Model.Errors.Count lỗi</b>
+                Chưa có dữ liệu nào được lưu. Hãy sửa file Word theo danh sách bên dưới rồi upload lại.
+            </div>
+        </div>
+        <div class="tz-tablewrap">
+            <table class="tz-table">
+                <colgroup><col style="width:64px" /><col style="width:210px" /><col style="width:300px" /><col /></colgroup>
+                <thead><tr><th>#</th><th>Mã lỗi</th><th>Vị trí</th><th>Mô tả</th></tr></thead>
+                <tbody>
+                    @{ var i = 0; }
+                    @foreach (var e in Model.Errors)
+                    {
+                        i++;
+                        var loc = new List<string>();
+                        if (e.Paragraph.HasValue) { loc.Add("Đoạn " + e.Paragraph); }
+                        if (e.Table.HasValue) { loc.Add("Bảng " + e.Table); }
+                        if (e.PartNo.HasValue) { loc.Add("Part " + e.PartNo); }
+                        if (!string.IsNullOrEmpty(e.GroupCode)) { loc.Add("Nhóm " + e.GroupCode); }
+                        if (e.QuestionNo.HasValue) { loc.Add("Câu " + e.QuestionNo); }
+                        <tr>
+                            <td>@i</td>
+                            <td><span class="tz-code">@e.Code</span></td>
+                            <td class="plain" style="font-weight:500">@(loc.Count == 0 ? "—" : string.Join(" › ", loc))</td>
+                            <td>@e.Message</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+<div class="tz-card">
+    <div class="tz-card-head"><h2>Danh sách đề</h2></div>
+    <div class="tz-tablewrap">
+        <table class="tz-table" id="ExamsTable" style="min-width:980px">
+            <colgroup>
+                <col style="width:110px" /><col style="width:220px" /><col style="width:80px" /><col style="width:120px" />
+                <col style="width:90px" /><col style="width:70px" /><col style="width:110px" /><col />
+            </colgroup>
+            <thead>
+                <tr><th>Mã đề</th><th>Tên đề</th><th>Phiên bản</th><th>Trạng thái</th><th>Thời gian</th><th>Số câu</th><th>Ngày tạo</th><th>Thao tác</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var v in Model.Versions)
+                {
+                    var st = Status(v.Status);
+                    <tr>
+                        <td class="plain">@v.Code</td>
+                        <td class="strong">@v.Title</td>
+                        <td class="plain">v@(v.VersionNo)</td>
+                        <td><span class="tz-badge @st.Css">@st.Text</span></td>
+                        <td>@v.DurationMinutes phút</td>
+                        <td>@v.TotalQuestions</td>
+                        <td>@v.CreationTime.ToLocalTime().ToString("dd/MM/yyyy")</td>
+                        <td>
+                            <div class="acts">
+                                <a class="tz-link" asp-action="Preview" asp-route-id="@v.VersionId"><img class="tz-ico" src="~/img/figma/eye-blue.svg" alt="" />Xem trước</a>
+                                @if (v.Status == ExamVersionStatus.Draft)
+                                {
+                                    <a class="tz-link" asp-action="Preview" asp-route-id="@v.VersionId"><img class="tz-ico" src="~/img/figma/edit-blue.svg" alt="" />Sửa</a>
+                                    <button type="button" class="tz-link js-publish" data-version-id="@v.VersionId"><img class="tz-ico" src="~/img/figma/send-blue.svg" alt="" />Xuất bản</button>
+                                }
+                                else
+                                {
+                                    <button type="button" class="tz-link js-draft" data-version-id="@v.VersionId"><img class="tz-ico" src="~/img/figma/edit-blue.svg" alt="" />Tạo bản sửa</button>
+                                    <a class="tz-link" asp-action="Statistics" asp-route-id="@v.VersionId"><img class="tz-ico" src="~/img/figma/chart-blue.svg" alt="" />Thống kê</a>
+                                }
+                                @if (v.Status == ExamVersionStatus.Published)
+                                {
+                                    <button type="button" class="tz-link tz-link--danger js-unpublish" data-version-id="@v.VersionId">Dừng nhận thi</button>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+                @if (Model.Versions.Count == 0)
+                {
+                    <tr><td colspan="8" class="tz-empty">Chưa có đề nào. Hãy upload file Word ở trên.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

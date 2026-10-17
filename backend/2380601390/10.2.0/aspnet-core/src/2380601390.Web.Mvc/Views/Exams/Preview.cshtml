@@ -1,0 +1,244 @@
+@using _2380601390.Exams
+@using _2380601390.Web.Startup
+@using _2380601390.Web.Models.Exams
+@model ExamPreviewViewModel
+@{
+    Layout = "~/Views/Shared/Layout/_TeacherLayout.cshtml";
+    var p = Model.Preview;
+    ViewBag.Title = "Xem trước: " + p.Title;
+    ViewBag.CurrentPageName = PageNames.Exams;
+    var selGroup = Model.SelectedGroup;
+    var selPart = Model.SelectedPart;
+    var statusBadge = p.Status switch { ExamVersionStatus.Draft => ("Nháp", ""), ExamVersionStatus.Published => ("Đã xuất bản", "tz-badge--ok"), _ => ("Lưu trữ", "tz-badge--mut") };
+    string Range(IEnumerable<_2380601390.Exams.Teacher.Dto.QuestionPreviewDto> qs) { var l = qs.Select(x => x.SourceNo).ToList(); return l.Count == 0 ? "" : l.Min() + "–" + l.Max(); }
+    var allQuestions = p.Parts.SelectMany(x => x.Questions.Concat(x.Groups.SelectMany(g => g.Questions))).Count();
+    string OnOff(bool b) => b ? "Bật" : "Tắt";
+    var p5Label = "Part 5 · câu độc lập";
+    var grpLabel = selGroup == null ? "" : "Part " + selPart.PartNo + " · Nhóm " + selGroup.Code;
+}
+@section scripts
+{
+    <script src="~/view-resources/Views/Exams/Preview.js" asp-append-version="true"></script>
+}
+
+<div class="tz-head" id="PreviewRoot" data-version-id="@p.VersionId" data-title="@p.Title" data-duration="@p.DurationMinutes">
+    <div class="titles">
+        <h1 id="ExamTitle">Xem trước: @p.Title</h1>
+        <p>Phiên bản v@(p.VersionNo) · <span class="tz-badge @statusBadge.Item2" style="padding:2px 8px">@statusBadge.Item1</span> · @allQuestions câu · @p.DurationMinutes phút — rà soát chính tả, ảnh và nhóm câu hỏi trước khi xuất bản.</p>
+    </div>
+    <div class="acts">
+        <a class="tz-btn" asp-action="Index"><img class="tz-ico" src="~/img/figma/left-dark.svg" alt="" />Quay lại</a>
+        @if (p.Status == ExamVersionStatus.Draft)
+        {
+            <button type="button" class="tz-btn" id="BtnSettings">Cài đặt</button>
+            <button type="button" class="tz-btn" id="BtnValidate"><img class="tz-ico" src="~/img/figma/shield-dark.svg" alt="" />Kiểm tra hợp lệ</button>
+            <button type="button" class="tz-btn tz-btn--pri" id="BtnPublish"><img class="tz-ico" src="~/img/figma/send-white.svg" alt="" />Xuất bản</button>
+            <button type="button" class="tz-btn tz-btn--danger" id="BtnDelete">Xóa nháp</button>
+        }
+        @if (p.Status == ExamVersionStatus.Published)
+        {
+            <button type="button" class="tz-btn" id="BtnDraft">Tạo bản sửa</button>
+            <button type="button" class="tz-btn tz-btn--danger" id="BtnUnpublish">Dừng nhận thi</button>
+        }
+        @if (p.Status == ExamVersionStatus.Archived)
+        {
+            <button type="button" class="tz-btn" id="BtnDraft">Tạo bản sửa</button>
+        }
+    </div>
+</div>
+
+@if (p.Status != ExamVersionStatus.Draft)
+{
+    <div class="tz-alert tz-alert--info">Phiên bản này không thể sửa (bất biến). Bấm <b style="display:inline;font-size:13px">Tạo bản sửa</b> để tạo bản Nháp mới rồi chỉnh sửa.</div>
+}
+@if (p.Issues.Count > 0)
+{
+    <div class="tz-alert tz-alert--bad" id="IssuesBanner" style="align-items:flex-start">
+        <img class="tz-ico" src="~/img/figma/alert-red-22.svg" alt="" />
+        <div>
+            <b>Phiên bản chưa hợp lệ (@p.Issues.Count vấn đề) — chưa thể xuất bản</b>
+            <ul>
+                @foreach (var i in p.Issues.Take(15))
+                {
+                    <li><span class="tz-code">@i.Code</span> @i.Message</li>
+                }
+                @if (p.Issues.Count > 15)
+                {
+                    <li>… và @(p.Issues.Count - 15) vấn đề khác.</li>
+                }
+            </ul>
+        </div>
+    </div>
+}
+
+<div class="tz-body">
+    <div class="tz-card tz-outline">
+        <h3>Cấu trúc đề</h3>
+        @foreach (var part in p.Parts)
+        {
+            var partQs = part.Questions.Concat(part.Groups.SelectMany(g => g.Questions)).ToList();
+            var partActive = selGroup == null ? part.PartNo == selPart.PartNo : part.Groups.Any(g => g.Id == selGroup.Id);
+            <a class="part @(partActive ? "on" : "")" asp-action="Preview" asp-route-id="@p.VersionId" asp-route-sel="@(part.PartNo == 5 ? "p5" : "g" + part.Groups.First().Id)">
+                <b>Part @part.PartNo · @(part.PartNo == 5 ? "Câu độc lập" : part.PartNo == 6 ? "Điền vào đoạn văn" : "Đọc hiểu")</b>
+                <span>Câu @part.FromNo–@part.ToNo · @(part.PartNo == 5 ? partQs.Count + " câu" : part.Groups.Count + " nhóm") · trộn @(part.PartNo == 5 ? "câu" : "nhóm"): @OnOff(part.ShuffleItems)</span>
+            </a>
+            @foreach (var g in part.Groups)
+            {
+                <a class="grp @(selGroup != null && selGroup.Id == g.Id ? "on" : "")" asp-action="Preview" asp-route-id="@p.VersionId" asp-route-sel="@("g" + g.Id)">@g.Code<span>@Range(g.Questions)</span></a>
+            }
+        }
+    </div>
+
+    <div class="tz-content">
+        @if (selGroup == null)
+        {
+            <div class="tz-ghead">
+                <h2>Part @selPart.PartNo · Câu độc lập</h2>
+                <span class="tz-badge">@selPart.Questions.Count câu</span>
+                <span class="sp"></span>
+                <span class="tz-badge @(selPart.ShuffleItems ? "tz-badge--ok" : "")">Hoán vị câu: @OnOff(selPart.ShuffleItems)</span>
+                @if (p.CanEdit)
+                {
+                    <button type="button" class="tz-link js-edit-shuffle" data-part-id="@selPart.Id" data-part-no="@selPart.PartNo" data-part-shuffle="@selPart.ShuffleItems.ToString().ToLower()"><img class="tz-ico" src="~/img/figma/edit-blue.svg" alt="" />Sửa</button>
+                }
+            </div>
+            @foreach (var q in selPart.Questions)
+            {
+                <partial name="_QuestionCard" model="new QuestionCardModel { Question = q, CanEdit = p.CanEdit, IsPart6 = false, GroupLabel = p5Label }" />
+            }
+        }
+        else
+        {
+            <div class="tz-ghead">
+                <h2>Part @selPart.PartNo · Nhóm @selGroup.Code</h2>
+                <span class="tz-badge">@selGroup.Documents.Count tài liệu · @selGroup.Questions.Count câu</span>
+                <span class="sp"></span>
+                <span class="tz-badge @(selPart.ShuffleItems ? "tz-badge--ok" : "")">Hoán vị nhóm: @OnOff(selPart.ShuffleItems)</span>
+                <span class="tz-badge @(selGroup.ShuffleQuestions ? "tz-badge--ok" : "")">Hoán vị câu trong nhóm: @OnOff(selGroup.ShuffleQuestions)</span>
+                @if (p.CanEdit)
+                {
+                    <button type="button" class="tz-link js-edit-shuffle" data-part-id="@selPart.Id" data-part-no="@selPart.PartNo" data-part-shuffle="@selPart.ShuffleItems.ToString().ToLower()" data-group-id="@selGroup.Id" data-group-shuffle="@selGroup.ShuffleQuestions.ToString().ToLower()"><img class="tz-ico" src="~/img/figma/edit-blue.svg" alt="" />Sửa nhóm</button>
+                }
+            </div>
+            var di = 0;
+            @foreach (var d in selGroup.Documents)
+            {
+                di++;
+                var first = true;
+                <div class="tz-card tz-doc">
+                    <div class="cap">Tài liệu @di · @d.Code</div>
+                    @foreach (var b in d.Blocks)
+                    {
+                        if (b.Type == ContentBlockType.Text)
+                        {
+                            <div class="txt">
+                                <div class="t @(first ? "first" : "")">@PreviewText.Render(b.Text)</div>
+                                @if (p.CanEdit)
+                                {
+                                    <button type="button" class="tz-link js-edit-block" data-block-id="@b.Id" data-block-text="@b.Text" title="Sửa văn bản"><img class="tz-ico" src="~/img/figma/edit-blue.svg" alt="" /></button>
+                                }
+                            </div>
+                            first = false;
+                        }
+                        else
+                        {
+                            <img class="media" src="@Url.Action("Get", "Media", new { id = b.MediaAssetId })" alt="@(b.AltText ?? "Ảnh nhúng trong tài liệu")" loading="lazy" />
+                        }
+                    }
+                </div>
+            }
+            @foreach (var q in selGroup.Questions)
+            {
+                <partial name="_QuestionCard" model="new QuestionCardModel { Question = q, CanEdit = p.CanEdit, IsPart6 = selPart.PartNo == 6, GroupLabel = grpLabel }" />
+            }
+        }
+    </div>
+</div>
+
+@* ===== Ngăn kéo sửa câu hỏi (Figma W4) ===== *@
+<div class="tz-overlay" id="DrawerOverlay"></div>
+<form class="tz-drawer" id="QuestionDrawer" autocomplete="off">
+    <div class="dh">
+        <div class="t"><b id="QTitle">Sửa câu hỏi</b><span id="QSub"></span></div>
+        <button type="button" data-drawer-close aria-label="Đóng"><img class="tz-ico" src="~/img/figma/x-20.svg" alt="" /></button>
+    </div>
+    <div class="db">
+        <input type="hidden" id="QId" />
+        <div class="tz-field"><label for="QStem">Nội dung câu hỏi <small class="text-muted" id="QStemHint"></small></label><textarea id="QStem" class="tz-input" rows="3"></textarea></div>
+        <div class="tz-field">
+            <span class="lb">Lựa chọn và đáp án đúng</span>
+            @foreach (var c in new[] { "A", "B", "C", "D" })
+            {
+                <div class="tz-optrow">
+                    <input type="radio" name="QCorrect" value="@c" id="QCorrect@(c)" />
+                    <span class="lt">@c</span>
+                    <input type="text" class="tz-input q-option" data-code="@c" id="QOpt@(c)" />
+                </div>
+            }
+        </div>
+        <div class="tz-field"><label for="QExplain">Giải thích / gợi ý (chỉ hiện sau khi nộp)</label><textarea id="QExplain" class="tz-input" rows="3"></textarea></div>
+        <div class="tz-switchbox">
+            <b>Cấu hình hoán vị</b>
+            <label class="tz-switchrow"><span>Cho phép hoán vị lựa chọn</span><span class="tz-switch"><input type="checkbox" id="QShuffle" /><i></i></span></label>
+        </div>
+        <div class="tz-valid"><img class="tz-ico" src="~/img/figma/shield-green.svg" alt="" /><span>Hệ thống sẽ kiểm tra lại toàn bộ đề khi lưu: đủ 4 lựa chọn, đáp án tồn tại, có giải thích.</span></div>
+    </div>
+    <div class="df">
+        <button type="button" class="tz-btn" data-drawer-close>Hủy</button>
+        <button type="submit" class="tz-btn tz-btn--pri"><img class="tz-ico" src="~/img/figma/check-white.svg" alt="" />Lưu và kiểm tra lại</button>
+    </div>
+</form>
+
+<div class="modal fade" id="BlockModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <form class="modal-content" id="BlockForm">
+            <div class="modal-header"><h5 class="modal-title">Sửa văn bản bài đọc</h5><button type="button" class="close" data-bs-dismiss="modal"><span>&times;</span></button></div>
+            <div class="modal-body">
+                <input type="hidden" id="BId" />
+                <textarea id="BText" class="tz-input" rows="8"></textarea>
+                <small style="color:#64748b">Part 6: giữ nguyên các đánh dấu chỗ trống dạng <code>{{blank:id-câu}}</code>.</small>
+            </div>
+            <div class="modal-footer"><button type="button" class="tz-btn" data-bs-dismiss="modal">Hủy</button><button type="submit" class="tz-btn tz-btn--pri">Lưu và kiểm tra lại</button></div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="ShuffleModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form class="modal-content" id="ShuffleForm">
+            <div class="modal-header"><h5 class="modal-title">Cấu hình hoán vị</h5><button type="button" class="close" data-bs-dismiss="modal"><span>&times;</span></button></div>
+            <div class="modal-body">
+                <input type="hidden" id="SPartId" /><input type="hidden" id="SGroupId" />
+                <div class="tz-switchbox">
+                    <label class="tz-switchrow"><span id="SPartLabel">Hoán vị</span><span class="tz-switch"><input type="checkbox" id="SPart" /><i></i></span></label>
+                    <label class="tz-switchrow" id="SGroupWrap"><span>Hoán vị câu trong nhóm này <small id="SGroupHint" style="display:block;color:#64748b"></small></span><span class="tz-switch"><input type="checkbox" id="SGroup" /><i></i></span></label>
+                </div>
+                <div style="font-size:12px;color:#64748b;margin-top:12px">Ranh giới các Part luôn được giữ; câu không bao giờ bị tách khỏi nhóm tài liệu.</div>
+            </div>
+            <div class="modal-footer"><button type="button" class="tz-btn" data-bs-dismiss="modal">Hủy</button><button type="submit" class="tz-btn tz-btn--pri">Lưu</button></div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="SettingsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form class="modal-content" id="SettingsForm">
+            <div class="modal-header"><h5 class="modal-title">Cài đặt đề</h5><button type="button" class="close" data-bs-dismiss="modal"><span>&times;</span></button></div>
+            <div class="modal-body">
+                <div class="tz-field" style="margin-bottom:16px"><label for="SetTitle">Tên đề</label><input type="text" id="SetTitle" class="tz-input" maxlength="256" /></div>
+                <div class="tz-field"><label for="SetDuration">Thời gian làm bài (phút)</label><input type="number" id="SetDuration" class="tz-input" min="1" max="300" /></div>
+            </div>
+            <div class="modal-footer"><button type="button" class="tz-btn" data-bs-dismiss="modal">Hủy</button><button type="submit" class="tz-btn tz-btn--pri">Lưu</button></div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="IssuesModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title" id="IssuesTitle">Kết quả kiểm tra</h5><button type="button" class="close" data-bs-dismiss="modal"><span>&times;</span></button></div>
+            <div class="modal-body" id="IssuesBody"></div>
+            <div class="modal-footer"><button type="button" class="tz-btn" data-bs-dismiss="modal">Đóng</button></div>
+        </div>
+    </div>
+</div>

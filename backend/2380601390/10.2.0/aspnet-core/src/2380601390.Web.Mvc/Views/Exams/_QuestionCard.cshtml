@@ -1,0 +1,53 @@
+@using System.Text.Json
+@using _2380601390.Web.Models.Exams
+@model QuestionCardModel
+@{
+    var q = Model.Question;
+    var json = JsonSerializer.Serialize(new
+    {
+        id = q.Id,
+        no = q.SourceNo,
+        code = q.Code,
+        stem = q.Stem ?? "",
+        explanation = q.Explanation ?? "",
+        shuffleOptions = q.ShuffleOptions,
+        correct = q.CorrectOptionCode,
+        options = q.Options.Select(o => new { code = o.Code, text = o.Text }),
+        part6 = Model.IsPart6,
+        group = Model.GroupLabel
+    }, new JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
+}
+<div class="tz-card tz-q" id="q-@q.Id">
+    <div class="qh">
+        <span class="tz-badge tz-badge--pri">Câu @q.SourceNo</span>
+        <small>@q.Code · số câu gốc @q.SourceNo · hoán vị lựa chọn: @(q.ShuffleOptions ? "Bật" : "Tắt")</small>
+        @if (Model.CanEdit)
+        {
+            <button type="button" class="tz-link js-edit-question" data-question="@json"><img class="tz-ico" src="~/img/figma/edit-blue.svg" alt="" />Sửa</button>
+        }
+    </div>
+    @if (string.IsNullOrWhiteSpace(q.Stem))
+    {
+        <p class="stem empty">(Part 6: câu hỏi chỉ có số thứ tự, gắn với chỗ trống trong bài đọc)</p>
+    }
+    else
+    {
+        <p class="stem">@q.Stem</p>
+    }
+    @foreach (var o in q.Options)
+    {
+        var ok = o.Code == q.CorrectOptionCode;
+        <div class="tz-opt @(ok ? "ok" : "")">
+            <span class="l">@o.Code</span>
+            <span class="t">@o.Text</span>
+            @if (ok)
+            {
+                <span class="tag"><img class="tz-ico" src="~/img/figma/check-green.svg" alt="" />Đáp án đúng</span>
+            }
+        </div>
+    }
+    <div class="tz-explain">
+        <b>Giải thích (chỉ hiện cho sinh viên sau khi nộp bài)</b>
+        <p>@q.Explanation</p>
+    </div>
+</div>

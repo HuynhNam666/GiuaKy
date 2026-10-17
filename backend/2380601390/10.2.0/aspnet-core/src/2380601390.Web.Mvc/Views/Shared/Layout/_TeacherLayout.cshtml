@@ -1,0 +1,69 @@
+@using Abp.Authorization
+@using _2380601390.Authorization
+@using _2380601390.Sessions
+@using Abp.Web.Security.AntiForgery
+@using _2380601390.Web.Resources
+@inject IAbpAntiForgeryManager AbpAntiForgeryManager
+@inject IWebResourceManager WebResourceManager
+@inject IPermissionChecker PermissionChecker
+@inject ISessionAppService SessionAppService
+@{
+    AbpAntiForgeryManager.SetCookie(Context);
+    var pageTitle = !string.IsNullOrWhiteSpace(ViewBag.Title) ? ViewBag.Title + " / " : "";
+    pageTitle += "TOEIC Reading";
+    string current = ViewBag.CurrentPageName as string;
+    var login = await SessionAppService.GetCurrentLoginInformations();
+    var userName = login?.User?.UserName ?? "";
+    var fullName = login?.User?.Name ?? "Giảng viên";
+    var canManage = await PermissionChecker.IsGrantedAsync(PermissionNames.Pages_Exams_Manage);
+    var canStats = await PermissionChecker.IsGrantedAsync(PermissionNames.Pages_Exams_Statistics);
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>@pageTitle</title>
+    @await Html.PartialAsync("_Styles.cshtml")
+    <link href="~/css/inter.css" rel="stylesheet" asp-append-version="true" />
+    <link href="~/css/teacher.css" rel="stylesheet" asp-append-version="true" />
+    @RenderSection("styles", required: false)
+</head>
+<body class="tz">
+    <div class="tz-shell">
+        <aside class="tz-side">
+            <a class="tz-logo" href="~/Exams">
+                <span class="mark">T</span>
+                <span><b>TOEIC Reading</b><span>Cổng giảng viên</span></span>
+            </a>
+            <nav class="tz-menu">
+                @if (canManage)
+                {
+                    <a href="~/Exams" class="@(current == "Exams" ? "on" : "")">
+                        <img class="tz-ico" src="~/img/figma/@(current == "Exams" ? "file-white" : "file-slate").svg" alt="" />Đề thi
+                    </a>
+                }
+                @if (canStats)
+                {
+                    <a href="~/Exams/Statistics" class="@(current == "ExamStatistics" ? "on" : "")">
+                        <img class="tz-ico" src="~/img/figma/@(current == "ExamStatistics" ? "chart-white" : "chart-slate").svg" alt="" />Thống kê
+                    </a>
+                }
+            </nav>
+            <div class="tz-grow"></div>
+            <div class="tz-user">
+                <span class="av"><img class="tz-ico" src="~/img/figma/user.svg" alt="" /></span>
+                <span><b>@fullName</b><span>@userName</span></span>
+                <a class="out" href="~/Account/Logout" title="Đăng xuất">Thoát</a>
+            </div>
+        </aside>
+        <main class="tz-main">
+            @RenderBody()
+        </main>
+    </div>
+
+    @await Html.PartialAsync("_Scripts.cshtml")
+    @RenderSection("scripts", required: false)
+    @WebResourceManager.RenderScripts()
+</body>
+</html>

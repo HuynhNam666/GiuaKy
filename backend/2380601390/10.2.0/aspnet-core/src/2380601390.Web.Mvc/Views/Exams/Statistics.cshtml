@@ -1,0 +1,85 @@
+@using _2380601390.Exams
+@using _2380601390.Web.Startup
+@using _2380601390.Web.Models.Exams
+@model ExamStatisticsViewModel
+@{
+    Layout = "~/Views/Shared/Layout/_TeacherLayout.cshtml";
+    ViewBag.Title = "Thống kê & phân tích";
+    ViewBag.CurrentPageName = PageNames.ExamStatistics;
+    var s = Model.Stats;
+    string StatusText(ExamVersionStatus st) => st switch { ExamVersionStatus.Draft => "Nháp", ExamVersionStatus.Published => "Đã xuất bản", _ => "Lưu trữ" };
+    var maxWrong = s != null && s.TopWrong.Count > 0 ? s.TopWrong.Max(t => t.WrongCount) : 1;
+    var vi = System.Globalization.CultureInfo.GetCultureInfo("vi-VN");
+}
+@section scripts
+{
+    <script>
+        (function ($) {
+            $("#StatVersion").on("change", function () { location.href = abp.appPath + "Exams/Statistics/" + this.value; });
+        })(jQuery);
+    </script>
+}
+<div class="tz-head">
+    <div class="titles">
+        <h1>Thống kê &amp; phân tích</h1>
+        <p>Chỉ tính các lượt đã nộp (đã chấm). Lượt đang làm hiển thị riêng; câu bỏ qua không tính là sai.</p>
+    </div>
+    @if (Model.Versions.Count > 0)
+    {
+        <div class="acts">
+            <select id="StatVersion" class="tz-select">
+                @foreach (var v in Model.Versions)
+                {
+                    <option value="@v.VersionId" selected="@(s != null && s.ExamVersionId == v.VersionId)">@v.Title · v@(v.VersionNo) (@StatusText(v.Status))</option>
+                }
+            </select>
+        </div>
+    }
+</div>
+
+@if (s == null)
+{
+    <div class="tz-card tz-empty">Chưa có đề nào. Hãy upload file Word ở trang <a asp-action="Index" style="color:#2563eb">Đề thi</a>.</div>
+}
+else
+{
+    <div class="tz-kpi">
+        <div class="k"><div class="l">Lượt đã nộp</div><div class="v" style="color:#2563eb" id="KpiFinished">@s.FinishedCount</div><div class="n">trong @s.DistinctStudents sinh viên</div></div>
+        <div class="k"><div class="l">Đang làm</div><div class="v" style="color:#b45309" id="KpiInProgress">@s.InProgressCount</div><div class="n">chưa tính vào điểm TB</div></div>
+        <div class="k"><div class="l">Điểm trung bình</div><div class="v" style="color:#15803d" id="KpiAverage">@(s.AveragePercent.HasValue ? s.AveragePercent.Value.ToString("0.#", vi) + "%" : "—")</div><div class="n">đúng / tổng số câu</div></div>
+        <div class="k"><div class="l">Tự động thu bài</div><div class="v" style="color:#475569" id="KpiAuto">@s.AutoSubmittedCount</div><div class="n">lượt hết giờ được hệ thống thu</div></div>
+    </div>
+
+    <div class="tz-card">
+        <div class="tz-card-head">
+            <h2>Top 10 câu nhiều sinh viên làm sai nhất</h2>
+            <small>Xếp theo số lượt sai (chọn đáp án khác đáp án đúng); đồng hạng xếp theo số lượt bỏ qua.</small>
+        </div>
+        @if (s.TopWrong.Count == 0)
+        {
+            <div class="tz-empty">@(s.FinishedCount == 0 ? "Chưa có lượt nào được nộp cho phiên bản này." : "Chưa có câu nào bị làm sai.")</div>
+        }
+        else
+        {
+            <div class="tz-tablewrap">
+                <table class="tz-table" id="TopWrongTable" style="min-width:900px">
+                    <colgroup><col style="width:72px" /><col style="width:170px" /><col /><col style="width:260px" /><col style="width:100px" /><col style="width:110px" /></colgroup>
+                    <thead><tr><th>Hạng</th><th>Câu</th><th>Nội dung</th><th>Số lượt sai</th><th>Bỏ qua</th><th>Tỷ lệ sai</th></tr></thead>
+                    <tbody>
+                        @foreach (var t in s.TopWrong)
+                        {
+                            <tr>
+                                <td><span class="tz-rank @(t.Rank <= 3 ? "top" : "")">@t.Rank</span></td>
+                                <td class="strong">Câu @t.QuestionNo <span class="tz-badge" style="font-size:11px;padding:2px 8px;margin-left:6px">Part @t.PartNo</span></td>
+                                <td><div class="tz-ellipsis" title="@t.Stem">@t.Stem</div></td>
+                                <td><span class="tz-bar"><i style="width:@((int)Math.Round(100.0 * t.WrongCount / maxWrong))%"></i></span><b style="color:#0f172a">@t.WrongCount</b></td>
+                                <td>@t.SkippedCount</td>
+                                <td style="color:#b91c1c;font-weight:500">@t.WrongPercent.ToString("0.#", vi)%</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+}
